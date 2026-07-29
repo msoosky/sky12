@@ -54,7 +54,10 @@ async function loadCorpCodes(forceRefresh = false) {
 // 서버 기동 시 목록을 미리 데워두고, 이후 매일 강제로 다시 받아와 최신 상태를 유지한다.
 export const refreshCorpCodes = () => loadCorpCodes(true)
 
-const SEARCH_RESULT_LIMIT = 50
+// 50개로 캡을 걸었더니 "테크"(실제 99개), "바이오"(115개), "홀딩스"(90개) 같은 흔한
+// 검색어에서 절반 넘게 조용히 잘려나갔다. 200 정도면 실제 상장기업 검색어들을 넉넉히
+// 다 담으면서도, 한 글자짜리 극단적인 검색어가 수천 건을 렌더링하는 것은 막아준다.
+const SEARCH_RESULT_LIMIT = 200
 
 export async function searchCompanies(query) {
   const q = query.trim().toLowerCase()
@@ -67,7 +70,19 @@ export async function searchCompanies(query) {
   }
 
   const list = await loadCorpCodes()
-  return list.filter((c) => c.corpName.toLowerCase().includes(q)).slice(0, SEARCH_RESULT_LIMIT)
+  const matches = list.filter((c) => c.corpName.toLowerCase().includes(q))
+
+  // 검색어와 정확히 일치하거나 그 검색어로 시작하는 회사명을 위로 올려, 결과가 많을 때도
+  // 가장 관련 있는 회사부터 보이게 한다.
+  const rank = (name) => (name === q ? 0 : name.startsWith(q) ? 1 : 2)
+  matches.sort((a, b) => {
+    const an = a.corpName.toLowerCase()
+    const bn = b.corpName.toLowerCase()
+    const diff = rank(an) - rank(bn)
+    return diff !== 0 ? diff : an.localeCompare(bn, 'ko')
+  })
+
+  return matches.slice(0, SEARCH_RESULT_LIMIT)
 }
 
 export async function getReports(corpCode, years = 3) {
