@@ -434,148 +434,58 @@
     <script type="text/plain" id="app-source">
       const { useState, useEffect, useRef, useMemo, useContext, createContext } = React
 
-      /* =====================================================================
-         이 파일은 서버 없이 index.html 하나만으로 동작하는 완전 정적 버전이다.
-         DART(전자공시)·네이버 금융은 브라우저에서 직접 호출하면 CORS로 막히기
-         때문에(둘 다 Access-Control-Allow-Origin을 내려주지 않음), 실제 API 대신
-         아래 목(mock) 데이터 생성기로 검색·재무·시세·차트를 만들어 보여준다.
-         종목코드를 시드로 써서 같은 회사는 새로고침해도 항상 같은 값이 나온다.
-         ===================================================================== */
+      /* ===================== API 클라이언트 =====================
+         이 파일은 index.html 하나에 화면 전체가 들어있지만, DART(전자공시)·네이버
+         금융은 브라우저에서 직접 호출하면 CORS로 막혀서(둘 다 Access-Control-Allow-Origin을
+         내려주지 않음) 같은 폴더의 소형 서버(server/)가 대신 요청해준다. 이 서버는
+         계정/로그인 없이 순수하게 DART·네이버 프록시 역할만 한다. */
+      const BASE = '/api'
+      // 자주 안 바뀌는 데이터(보고서·재무·차트)는 길게, 실시간성이 중요한 시세는 짧게 캐싱해
+      // 체감 속도와 정확성 사이의 균형을 맞춘다. 서버 쪽에도 자체 캐시가 있어 이중으로 보호된다.
+      const TTL_DEFAULT = 5 * 60 * 1000
+      const TTL_PRICE = 20 * 1000
+      const requestCache = new Map()
 
-      function hashSeed(str) {
-        let h = 0
-        for (let i = 0; i < str.length; i++) h = (Math.imul(31, h) + str.charCodeAt(i)) | 0
-        return h
-      }
+      async function cachedFetch(url, ttl = TTL_DEFAULT) {
+        const hit = requestCache.get(url)
+        if (hit && Date.now() - hit.time < ttl) return hit.data
 
-      function mulberry32(seed) {
-        let a = seed
-        return function () {
-          a |= 0
-          a = (a + 0x6d2b79f5) | 0
-          let t = Math.imul(a ^ (a >>> 15), 1 | a)
-          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-          return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+        const res = await fetch(url)
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          throw new Error(body.error || `요청 실패: ${url}`)
         }
+        const data = await res.json()
+        requestCache.set(url, { data, time: Date.now() })
+        return data
       }
-
-      const MOCK_COMPANIES = [
-        { corpName: '삼성전자', stockCode: '005930' },
-        { corpName: 'SK하이닉스', stockCode: '000660' },
-        { corpName: 'NAVER', stockCode: '035420' },
-        { corpName: '카카오', stockCode: '035720' },
-        { corpName: 'LG에너지솔루션', stockCode: '373220' },
-        { corpName: '현대차', stockCode: '005380' },
-        { corpName: '기아', stockCode: '000270' },
-        { corpName: 'POSCO홀딩스', stockCode: '005490' },
-        { corpName: '삼성바이오로직스', stockCode: '207940' },
-        { corpName: 'LG화학', stockCode: '051910' },
-        { corpName: '삼성SDI', stockCode: '006400' },
-        { corpName: '현대모비스', stockCode: '012330' },
-        { corpName: 'KB금융', stockCode: '105560' },
-        { corpName: '신한지주', stockCode: '055550' },
-        { corpName: '셀트리온', stockCode: '068270' },
-        { corpName: '삼성물산', stockCode: '028260' },
-        { corpName: 'SK이노베이션', stockCode: '096770' },
-        { corpName: 'LG전자', stockCode: '066570' },
-        { corpName: '두산에너빌리티', stockCode: '034020' },
-        { corpName: '한화솔루션', stockCode: '009830' },
-        { corpName: '삼성화재해상보험', stockCode: '000810' },
-        { corpName: '삼성카드', stockCode: '029780' },
-        { corpName: '하나금융지주', stockCode: '086790' },
-        { corpName: '삼성중공업', stockCode: '010140' },
-        { corpName: 'SK텔레콤', stockCode: '017670' },
-        { corpName: 'KT', stockCode: '030200' },
-        { corpName: '우리금융지주', stockCode: '316140' },
-        { corpName: '삼성증권', stockCode: '016360' },
-        { corpName: '삼성생명', stockCode: '032830' },
-        { corpName: '롯데케미칼', stockCode: '011170' },
-      ].map((c) => ({ ...c, corpCode: c.stockCode }))
 
       const EARLIEST_CHART_YEAR = 2020
       const CURRENT_YEAR = new Date().getFullYear()
 
-      function isWeekday(date) {
-        const day = date.getDay()
-        return day !== 0 && day !== 6
-      }
+      const searchCompanies = (q) => cachedFetch(`${BASE}/search?q=${encodeURIComponent(q)}`, 60 * 1000)
+      const getReports = (corpCode) => cachedFetch(`${BASE}/company/${corpCode}/reports`)
+      const getFinancials = (corpCode) => cachedFetch(`${BASE}/company/${corpCode}/financials`)
+      const getPrice = (stockCode) => cachedFetch(`${BASE}/stock/${stockCode}/price`, TTL_PRICE)
+      const getChart = (stockCode, startYear, endYear) =>
+        cachedFetch(`${BASE}/stock/${stockCode}/chart?startYear=${startYear}&endYear=${endYear}`, 30 * 60 * 1000)
 
-      function generateMockChart(stockCode) {
-        const rand = mulberry32(hashSeed(stockCode))
-        let price = 20000 + Math.floor(rand() * 180000)
-        const rows = []
-        const cursor = new Date(EARLIEST_CHART_YEAR, 0, 1)
-        const today = new Date()
-        while (cursor <= today) {
-          if (isWeekday(cursor)) {
-            const changePct = (rand() - 0.5) * 0.06
-            price = Math.max(1000, Math.round(price * (1 + changePct)))
-            const y = cursor.getFullYear()
-            const m = String(cursor.getMonth() + 1).padStart(2, '0')
-            const d = String(cursor.getDate()).padStart(2, '0')
-            rows.push({ date: `${y}-${m}-${d}`, close: price })
-          }
-          cursor.setDate(cursor.getDate() + 1)
-        }
-        return rows
-      }
-
-      function generateMockPrice(corpName, chart) {
-        if (!chart || chart.length < 2) return null
-        const last = chart[chart.length - 1]
-        const prev = chart[chart.length - 2]
-        const change = last.close - prev.close
-        const changeRate = prev.close ? ((change / prev.close) * 100).toFixed(2) : '0.00'
+      // 보고서/재무/시세/차트를 병렬로 조회해 응답 속도를 최적화.
+      // allSettled를 써서 시세처럼 일부 종목에서만 실패하는 항목이 있어도
+      // 나머지(보고서·재무·차트)는 정상적으로 화면에 표시되도록 한다.
+      async function fetchCompanyDashboard(corpCode, stockCode) {
+        const [reports, financials, price, chart] = await Promise.allSettled([
+          getReports(corpCode),
+          getFinancials(corpCode),
+          getPrice(stockCode),
+          getChart(stockCode, EARLIEST_CHART_YEAR, CURRENT_YEAR),
+        ])
         return {
-          name: corpName,
-          price: last.close,
-          change: `${change >= 0 ? '+' : ''}${change.toLocaleString('ko-KR')}`,
-          changeRate,
-          isRising: change >= 0,
+          reports: reports.status === 'fulfilled' ? reports.value : [],
+          financials: financials.status === 'fulfilled' ? financials.value : [],
+          price: price.status === 'fulfilled' ? price.value : null,
+          chart: chart.status === 'fulfilled' ? chart.value : [],
         }
-      }
-
-      function generateMockFinancials(stockCode) {
-        const rand = mulberry32(hashSeed(stockCode + ':financials'))
-        const baseRevenue = 500_000_000_000 + Math.floor(rand() * 5_000_000_000_000)
-        return Array.from({ length: 3 }, (_, i) => {
-          const year = CURRENT_YEAR - 1 - i
-          const factor = 1 - i * (0.05 + rand() * 0.05)
-          const revenue = Math.round(baseRevenue * factor)
-          const operatingProfit = Math.round(revenue * (0.08 + rand() * 0.06))
-          const netIncome = Math.round(operatingProfit * (0.7 + rand() * 0.2))
-          return { year, available: true, revenue, operatingProfit, netIncome }
-        })
-      }
-
-      function generateMockReports(corpName) {
-        return Array.from({ length: 3 }, (_, i) => {
-          const year = CURRENT_YEAR - 1 - i
-          return {
-            reportName: `사업보고서 (${year}.12)`,
-            receiptNo: `SAMPLE-${year}`,
-            date: `${year}0331`,
-            filerName: corpName,
-            url: 'https://dart.fss.or.kr',
-          }
-        })
-      }
-
-      function searchCompanies(query) {
-        const q = query.trim().toLowerCase()
-        if (!q) return Promise.resolve([])
-        return Promise.resolve(MOCK_COMPANIES.filter((c) => c.corpName.toLowerCase().includes(q)))
-      }
-
-      function fetchCompanyDashboard(corpCode, stockCode, corpName) {
-        const name = corpName || corpCode
-        const chart = generateMockChart(stockCode)
-        return Promise.resolve({
-          reports: generateMockReports(name),
-          financials: generateMockFinancials(stockCode),
-          price: generateMockPrice(name, chart),
-          chart,
-        })
       }
 
       /* ===================== 관심기업 (브라우저 localStorage에 저장) ===================== */
@@ -945,11 +855,6 @@
               <p className="tagline">기업을 검색해 사업보고서·재무·시세·차트를 한눈에 확인하세요</p>
             </header>
 
-            <p className="notice">
-              이 페이지는 서버 없이 이 파일 하나만으로 동작하는 정적 버전입니다. 브라우저에서는 전자공시(DART)·네이버
-              금융에 직접 접속할 수 없어(CORS 제한), 아래 기업 목록과 재무·시세·차트는 예시(샘플) 데이터입니다.
-            </p>
-
             <div className="search-box" ref={boxRef}>
               <form className="search-form" onSubmit={handleSearch}>
                 <input
@@ -1019,7 +924,7 @@
           let cancelled = false
           setLoading(true)
           setError(null)
-          fetchCompanyDashboard(corpCode, stockCode, corpNameParam)
+          fetchCompanyDashboard(corpCode, stockCode)
             .then((result) => {
               if (!cancelled) setData(result)
             })
@@ -1116,11 +1021,6 @@
 
             {data && (
               <>
-                <p className="notice">
-                  이 페이지는 정적 파일 버전이라 실제 공시·시세를 가져올 수 없어, 아래 수치는 모두 예시(샘플)
-                  데이터입니다.
-                </p>
-
                 <section className="section">
                   <h2>현재 시세</h2>
                   {data.price ? (
