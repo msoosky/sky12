@@ -5,9 +5,1317 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>페이지</title>
     <meta name="description" content="기업을 검색해 사업보고서·재무·시세·차트를 한눈에 확인하고 관심기업으로 저장하는 사이트" />
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #f5f6f8;
+        color: #1a1a1a;
+      }
+
+      .page {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 0 1.5rem 3rem;
+      }
+
+      .header {
+        text-align: center;
+        padding: 3rem 0 2rem;
+      }
+
+      .header h1 {
+        margin: 0;
+        font-size: 2.25rem;
+        color: #0f172a;
+      }
+
+      .tagline {
+        margin: 0.25rem 0 1.5rem;
+        color: #64748b;
+      }
+
+      .section {
+        background: #fff;
+        border-radius: 12px;
+        padding: 1.75rem 2rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      }
+
+      .section h2 {
+        margin-top: 0;
+        color: #0f172a;
+      }
+
+      .notice {
+        background: #fef9c3;
+        color: #854d0e;
+        border: 1px solid #fde68a;
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .search-form {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .search-form input {
+        flex: 1;
+        padding: 0.65rem 0.9rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 1rem;
+      }
+
+      .search-form button {
+        padding: 0.65rem 1.25rem;
+        border: none;
+        border-radius: 8px;
+        background: #1d4ed8;
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .search-form button:disabled {
+        background: #94a3b8;
+        cursor: default;
+      }
+
+      .search-results {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .result-item {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        padding: 0.9rem 1.1rem;
+        margin-bottom: 0.5rem;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1rem;
+        text-align: left;
+      }
+
+      .result-item:hover {
+        border-color: #1d4ed8;
+      }
+
+      .result-code {
+        color: #94a3b8;
+      }
+
+      .back-link {
+        display: inline-block;
+        margin: 1.5rem 0 1rem;
+        color: #1d4ed8;
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      .status {
+        text-align: center;
+        color: #64748b;
+        padding: 1rem 0;
+      }
+
+      .status.error {
+        color: #dc2626;
+      }
+
+      .price-summary {
+        display: flex;
+        align-items: baseline;
+        gap: 0.75rem;
+      }
+
+      .price {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #0f172a;
+      }
+
+      .up {
+        color: #dc2626;
+        font-weight: 600;
+      }
+
+      .down {
+        color: #2563eb;
+        font-weight: 600;
+      }
+
+      .financial-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .financial-table th,
+      .financial-table td {
+        text-align: right;
+        padding: 0.6rem 0.5rem;
+        border-bottom: 1px solid #e2e8f0;
+      }
+
+      .financial-table th:first-child,
+      .financial-table td:first-child {
+        text-align: left;
+      }
+
+      .report-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .report-list li {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #e2e8f0;
+      }
+
+      .report-list a {
+        color: #1d4ed8;
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      .report-list a:hover {
+        text-decoration: underline;
+      }
+
+      .report-meta {
+        color: #94a3b8;
+        font-size: 0.85rem;
+        white-space: nowrap;
+        margin-left: 1rem;
+      }
+
+      /* 상단 내비게이션 */
+      .topnav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 1.25rem 1.5rem 0;
+      }
+
+      .brand {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #0f172a;
+        text-decoration: none;
+      }
+
+      .topnav-links {
+        display: flex;
+        align-items: center;
+        gap: 1.25rem;
+      }
+
+      .topnav-links a {
+        color: #1d4ed8;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.95rem;
+      }
+
+      .topnav-links a:hover {
+        text-decoration: underline;
+      }
+
+      .nav-user {
+        color: #64748b;
+        font-size: 0.9rem;
+      }
+
+      .link-btn {
+        background: none;
+        border: none;
+        color: #1d4ed8;
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        padding: 0;
+      }
+
+      .link-btn:hover {
+        text-decoration: underline;
+      }
+
+      /* 검색 자동완성 */
+      .search-box {
+        position: relative;
+        margin-bottom: 1.5rem;
+      }
+
+      .search-box .search-form {
+        margin-bottom: 0;
+      }
+
+      .autocomplete-list {
+        position: absolute;
+        top: calc(100% + 0.35rem);
+        left: 0;
+        right: 0;
+        z-index: 20;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+        list-style: none;
+        margin: 0;
+        padding: 0.35rem;
+        max-height: 320px;
+        overflow-y: auto;
+      }
+
+      .autocomplete-item {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        padding: 0.6rem 0.75rem;
+        border: none;
+        background: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.95rem;
+        text-align: left;
+      }
+
+      .autocomplete-item:hover,
+      .autocomplete-item.active {
+        background: #eff6ff;
+      }
+
+      /* 관심기업 */
+      .company-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin: 1rem 0 1.5rem;
+      }
+
+      .company-header h1 {
+        margin: 0;
+        font-size: 1.75rem;
+        color: #0f172a;
+      }
+
+      .watch-btn {
+        flex-shrink: 0;
+        padding: 0.55rem 1.1rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        background: #fff;
+        color: #475569;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .watch-btn.active {
+        border-color: #f59e0b;
+        color: #b45309;
+        background: #fffbeb;
+      }
+
+      .watch-btn:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+
+      .watchlist-row {
+        display: flex;
+        align-items: stretch;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .watchlist-row .result-item {
+        flex: 1;
+        margin-bottom: 0;
+        text-decoration: none;
+        color: inherit;
+      }
+
+      .remove-btn {
+        padding: 0 1rem;
+        border: 1px solid #fecaca;
+        border-radius: 8px;
+        background: #fef2f2;
+        color: #dc2626;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .remove-btn:hover {
+        background: #fee2e2;
+      }
+
+      /* 로그인/회원가입 */
+      .auth-page {
+        max-width: 380px;
+      }
+
+      .auth-page h1 {
+        text-align: center;
+        color: #0f172a;
+      }
+
+      .auth-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-top: 1.5rem;
+      }
+
+      .auth-form input {
+        padding: 0.65rem 0.9rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 1rem;
+      }
+
+      .auth-form button {
+        padding: 0.65rem 1.25rem;
+        border: none;
+        border-radius: 8px;
+        background: #1d4ed8;
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .auth-form button:disabled {
+        background: #94a3b8;
+        cursor: default;
+      }
+
+      .auth-switch {
+        text-align: center;
+        color: #64748b;
+        margin-top: 1rem;
+      }
+
+      .auth-switch a {
+        color: #1d4ed8;
+        font-weight: 600;
+        text-decoration: none;
+      }
+
+      .auth-switch a:hover {
+        text-decoration: underline;
+      }
+
+      /* 차트 (커스텀 SVG, 외부 라이브러리 없음) */
+      .chart-wrap {
+        position: relative;
+      }
+
+      .stock-svg {
+        width: 100%;
+        height: 280px;
+        display: block;
+        cursor: crosshair;
+      }
+
+      .chart-grid {
+        stroke: #e2e8f0;
+        stroke-dasharray: 3 3;
+      }
+
+      .chart-axis-label {
+        fill: #94a3b8;
+        font-size: 11px;
+      }
+
+      .chart-crosshair {
+        stroke: #94a3b8;
+        stroke-dasharray: 2 2;
+      }
+
+      .chart-tooltip {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background: #0f172a;
+        color: #fff;
+        border-radius: 8px;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        pointer-events: none;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/plain" id="app-source">
+      const { useState, useEffect, useRef, useContext, createContext } = React
+
+      /* ===================== API 클라이언트 ===================== */
+      const BASE = '/api'
+      const TTL = 60 * 1000
+      const requestCache = new Map()
+
+      async function cachedFetch(url) {
+        const hit = requestCache.get(url)
+        if (hit && Date.now() - hit.time < TTL) return hit.data
+
+        const res = await fetch(url)
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          throw new Error(body.error || `요청 실패: ${url}`)
+        }
+        const data = await res.json()
+        requestCache.set(url, { data, time: Date.now() })
+        return data
+      }
+
+      const searchCompanies = (q) => cachedFetch(`${BASE}/search?q=${encodeURIComponent(q)}`)
+      const getReports = (corpCode) => cachedFetch(`${BASE}/company/${corpCode}/reports`)
+      const getFinancials = (corpCode) => cachedFetch(`${BASE}/company/${corpCode}/financials`)
+      const getPrice = (stockCode) => cachedFetch(`${BASE}/stock/${stockCode}/price`)
+      const getChart = (stockCode) => cachedFetch(`${BASE}/stock/${stockCode}/chart`)
+
+      // 보고서/재무/시세/차트를 병렬로 조회해 응답 속도를 최적화
+      async function fetchCompanyDashboard(corpCode, stockCode) {
+        const [reports, financials, price, chart] = await Promise.all([
+          getReports(corpCode),
+          getFinancials(corpCode),
+          getPrice(stockCode),
+          getChart(stockCode),
+        ])
+        return { reports, financials, price, chart }
+      }
+
+      async function jsonFetch(url, options = {}) {
+        const res = await fetch(url, {
+          ...options,
+          headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+          credentials: 'include',
+        })
+        const body = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(body.error || '요청 실패')
+        return body
+      }
+
+      const apiRegister = (email, password) =>
+        jsonFetch(`${BASE}/auth/register`, { method: 'POST', body: JSON.stringify({ email, password }) })
+      const apiLogin = (email, password) =>
+        jsonFetch(`${BASE}/auth/login`, { method: 'POST', body: JSON.stringify({ email, password }) })
+      const apiLogout = () => jsonFetch(`${BASE}/auth/logout`, { method: 'POST' })
+      const fetchMe = () => jsonFetch(`${BASE}/auth/me`)
+
+      const getWatchlist = () => jsonFetch(`${BASE}/watchlist`)
+      const addToWatchlist = (company) =>
+        jsonFetch(`${BASE}/watchlist`, { method: 'POST', body: JSON.stringify(company) })
+      const removeFromWatchlist = (id) => jsonFetch(`${BASE}/watchlist/${id}`, { method: 'DELETE' })
+
+      /* ===================== 라우터 (외부 의존성 없는 경량 구현) ===================== */
+      const NavigateContext = createContext(() => {})
+
+      function useRouter() {
+        const [url, setUrl] = useState(window.location.pathname + window.location.search)
+
+        useEffect(() => {
+          const onPop = () => setUrl(window.location.pathname + window.location.search)
+          window.addEventListener('popstate', onPop)
+          return () => window.removeEventListener('popstate', onPop)
+        }, [])
+
+        const navigate = (to) => {
+          if (to === url) return
+          window.history.pushState({}, '', to)
+          setUrl(to)
+          window.scrollTo(0, 0)
+        }
+
+        return [url, navigate]
+      }
+
+      function matchRoute(pathname) {
+        if (pathname === '/') return { name: 'search' }
+        const companyMatch = pathname.match(/^\/company\/([^/]+)$/)
+        if (companyMatch) return { name: 'company', corpCode: decodeURIComponent(companyMatch[1]) }
+        if (pathname === '/watchlist') return { name: 'watchlist' }
+        if (pathname === '/login') return { name: 'login' }
+        if (pathname === '/register') return { name: 'register' }
+        return { name: 'notfound' }
+      }
+
+      function Link({ to, className, children }) {
+        const navigate = useContext(NavigateContext)
+        return (
+          <a
+            href={to}
+            className={className}
+            onClick={(e) => {
+              e.preventDefault()
+              navigate(to)
+            }}
+          >
+            {children}
+          </a>
+        )
+      }
+
+      /* ===================== 인증 컨텍스트 ===================== */
+      const AuthContext = createContext(null)
+
+      function AuthProvider({ children }) {
+        const [user, setUser] = useState(null)
+        const [loading, setLoading] = useState(true)
+
+        useEffect(() => {
+          fetchMe()
+            .then(setUser)
+            .catch(() => setUser(null))
+            .finally(() => setLoading(false))
+        }, [])
+
+        const login = async (email, password) => setUser(await apiLogin(email, password))
+        const register = async (email, password) => setUser(await apiRegister(email, password))
+        const logout = async () => {
+          await apiLogout()
+          setUser(null)
+        }
+
+        return (
+          <AuthContext.Provider value={{ user, loading, login, register, logout }}>{children}</AuthContext.Provider>
+        )
+      }
+
+      function useAuth() {
+        return useContext(AuthContext)
+      }
+
+      /* ===================== 공용 컴포넌트 ===================== */
+      function Nav() {
+        const { user, logout } = useAuth()
+        const navigate = useContext(NavigateContext)
+
+        const handleLogout = async () => {
+          await logout()
+          navigate('/')
+        }
+
+        return (
+          <nav className="topnav">
+            <Link to="/" className="brand">
+              페이지
+            </Link>
+            <div className="topnav-links">
+              <Link to="/watchlist">관심기업</Link>
+              {user ? (
+                <>
+                  <span className="nav-user">{user.email}</span>
+                  <button type="button" className="link-btn" onClick={handleLogout}>
+                    로그아웃
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link to="/login">로그인</Link>
+                  <Link to="/register">회원가입</Link>
+                </>
+              )}
+            </div>
+          </nav>
+        )
+      }
+
+      function formatNumber(value) {
+        if (value === undefined || value === null) return '-'
+        return Number(value).toLocaleString('ko-KR')
+      }
+
+      function FinancialTable({ data }) {
+        if (!data || data.length === 0) return <p className="status">재무 데이터가 없습니다.</p>
+
+        return (
+          <table className="financial-table">
+            <thead>
+              <tr>
+                <th>연도</th>
+                <th>매출액</th>
+                <th>영업이익</th>
+                <th>당기순이익</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row) => (
+                <tr key={row.year}>
+                  <td>{row.year}</td>
+                  {row.available ? (
+                    <>
+                      <td>{formatNumber(row.revenue)}</td>
+                      <td>{formatNumber(row.operatingProfit)}</td>
+                      <td>{formatNumber(row.netIncome)}</td>
+                    </>
+                  ) : (
+                    <td colSpan={3}>데이터 없음</td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      }
+
+      function ReportList({ reports }) {
+        if (!reports || reports.length === 0) return <p className="status">사업보고서가 없습니다.</p>
+
+        return (
+          <ul className="report-list">
+            {reports.map((r) => (
+              <li key={r.receiptNo}>
+                <a href={r.url} target="_blank" rel="noreferrer">
+                  {r.reportName}
+                </a>
+                <span className="report-meta">
+                  {r.filerName} · {r.date}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+
+      // Recharts 등 외부 차트 라이브러리 없이 순수 SVG로 그리는 시세 차트
+      function StockChart({ data }) {
+        const svgRef = useRef(null)
+        const [hoverIdx, setHoverIdx] = useState(null)
+
+        if (!data || data.length === 0) return <p className="status">차트 데이터가 없습니다.</p>
+
+        const width = 700
+        const height = 280
+        const padding = { top: 10, right: 10, bottom: 24, left: 60 }
+        const innerW = width - padding.left - padding.right
+        const innerH = height - padding.top - padding.bottom
+
+        const closes = data.map((d) => d.close)
+        const min = Math.min(...closes)
+        const max = Math.max(...closes)
+        const span = max - min || 1
+
+        const xAt = (i) => padding.left + (i / Math.max(data.length - 1, 1)) * innerW
+        const yAt = (v) => padding.top + innerH - ((v - min) / span) * innerH
+
+        const pathD = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i).toFixed(2)} ${yAt(d.close).toFixed(2)}`).join(' ')
+        const isRising = closes[closes.length - 1] >= closes[0]
+        const lineColor = isRising ? '#dc2626' : '#2563eb'
+
+        const tickCount = 4
+        const yTicks = Array.from({ length: tickCount + 1 }, (_, i) => min + (span * i) / tickCount)
+
+        const handleMove = (e) => {
+          const rect = svgRef.current.getBoundingClientRect()
+          const relX = ((e.clientX - rect.left) / rect.width) * width
+          const ratio = (relX - padding.left) / innerW
+          const idx = Math.min(data.length - 1, Math.max(0, Math.round(ratio * (data.length - 1))))
+          setHoverIdx(idx)
+        }
+
+        return (
+          <div className="chart-wrap">
+            <svg
+              ref={svgRef}
+              viewBox={`0 0 ${width} ${height}`}
+              className="stock-svg"
+              onMouseMove={handleMove}
+              onMouseLeave={() => setHoverIdx(null)}
+            >
+              {yTicks.map((t, i) => (
+                <g key={i}>
+                  <line x1={padding.left} x2={width - padding.right} y1={yAt(t)} y2={yAt(t)} className="chart-grid" />
+                  <text x={padding.left - 8} y={yAt(t)} textAnchor="end" dominantBaseline="middle" className="chart-axis-label">
+                    {Math.round(t).toLocaleString('ko-KR')}
+                  </text>
+                </g>
+              ))}
+
+              <path d={pathD} fill="none" stroke={lineColor} strokeWidth="2" />
+
+              {hoverIdx !== null && (
+                <>
+                  <line
+                    x1={xAt(hoverIdx)}
+                    x2={xAt(hoverIdx)}
+                    y1={padding.top}
+                    y2={height - padding.bottom}
+                    className="chart-crosshair"
+                  />
+                  <circle cx={xAt(hoverIdx)} cy={yAt(data[hoverIdx].close)} r="4" fill={lineColor} />
+                </>
+              )}
+
+              <text x={padding.left} y={height - 4} className="chart-axis-label">
+                {data[0]?.date}
+              </text>
+              <text x={width - padding.right} y={height - 4} textAnchor="end" className="chart-axis-label">
+                {data[data.length - 1]?.date}
+              </text>
+            </svg>
+
+            {hoverIdx !== null && (
+              <div className="chart-tooltip">
+                <strong>{data[hoverIdx].date}</strong>
+                <span>{formatNumber(data[hoverIdx].close)}원</span>
+              </div>
+            )}
+          </div>
+        )
+      }
+
+      /* ===================== 페이지 ===================== */
+      const DEBOUNCE_MS = 200
+      const MAX_SUGGESTIONS = 8
+
+      function SearchPage() {
+        const navigate = useContext(NavigateContext)
+        const [query, setQuery] = useState('')
+        const [suggestions, setSuggestions] = useState([])
+        const [showSuggestions, setShowSuggestions] = useState(false)
+        const [activeIndex, setActiveIndex] = useState(-1)
+        const [results, setResults] = useState([])
+        const [loading, setLoading] = useState(false)
+        const [error, setError] = useState(null)
+        const boxRef = useRef(null)
+
+        useEffect(() => {
+          const q = query.trim()
+          if (!q) {
+            setSuggestions([])
+            return
+          }
+          let cancelled = false
+          const timer = setTimeout(async () => {
+            try {
+              const list = await searchCompanies(q)
+              if (!cancelled) setSuggestions(list.slice(0, MAX_SUGGESTIONS))
+            } catch {
+              if (!cancelled) setSuggestions([])
+            }
+          }, DEBOUNCE_MS)
+          return () => {
+            cancelled = true
+            clearTimeout(timer)
+          }
+        }, [query])
+
+        useEffect(() => {
+          setActiveIndex(-1)
+        }, [suggestions])
+
+        useEffect(() => {
+          function onClickOutside(e) {
+            if (boxRef.current && !boxRef.current.contains(e.target)) setShowSuggestions(false)
+          }
+          document.addEventListener('mousedown', onClickOutside)
+          return () => document.removeEventListener('mousedown', onClickOutside)
+        }, [])
+
+        const goToCompany = (c) => {
+          setShowSuggestions(false)
+          navigate(`/company/${c.corpCode}?stockCode=${c.stockCode}&corpName=${encodeURIComponent(c.corpName)}`)
+        }
+
+        const handleSearch = async (e) => {
+          e.preventDefault()
+          if (!query.trim()) return
+          setShowSuggestions(false)
+          setLoading(true)
+          setError(null)
+          try {
+            setResults(await searchCompanies(query))
+          } catch (err) {
+            setError(err.message)
+          } finally {
+            setLoading(false)
+          }
+        }
+
+        const handleKeyDown = (e) => {
+          if (!showSuggestions || suggestions.length === 0) return
+          if (e.key === 'ArrowDown') {
+            e.preventDefault()
+            setActiveIndex((i) => Math.min(i + 1, suggestions.length - 1))
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault()
+            setActiveIndex((i) => Math.max(i - 1, 0))
+          } else if (e.key === 'Enter' && activeIndex >= 0) {
+            e.preventDefault()
+            goToCompany(suggestions[activeIndex])
+          } else if (e.key === 'Escape') {
+            setShowSuggestions(false)
+          }
+        }
+
+        return (
+          <div className="page">
+            <header className="header">
+              <h1>페이지</h1>
+              <p className="tagline">기업을 검색해 사업보고서·재무·시세·차트를 한눈에 확인하세요</p>
+            </header>
+
+            <div className="search-box" ref={boxRef}>
+              <form className="search-form" onSubmit={handleSearch}>
+                <input
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value)
+                    setShowSuggestions(true)
+                  }}
+                  onFocus={() => setShowSuggestions(true)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="기업명을 입력하세요 (예: 삼성전자)"
+                  autoComplete="off"
+                />
+                <button type="submit" disabled={loading}>
+                  {loading ? '검색 중...' : '검색'}
+                </button>
+              </form>
+
+              {showSuggestions && suggestions.length > 0 && (
+                <ul className="autocomplete-list">
+                  {suggestions.map((c, i) => (
+                    <li key={c.corpCode}>
+                      <button
+                        type="button"
+                        className={`autocomplete-item${i === activeIndex ? ' active' : ''}`}
+                        onMouseDown={() => goToCompany(c)}
+                      >
+                        <span className="result-name">{c.corpName}</span>
+                        <span className="result-code">{c.stockCode}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {error && <p className="status error">오류: {error}</p>}
+
+            {results.some((c) => c.mock) && (
+              <p className="notice">
+                DART API 키가 아직 발급되지 않아 샘플 기업 목록을 보여드리고 있습니다. 키가 발급되면 전체 상장사 검색으로
+                자동 전환됩니다.
+              </p>
+            )}
+
+            <ul className="search-results">
+              {results.map((c) => (
+                <li key={c.corpCode}>
+                  <button
+                    className="result-item"
+                    onClick={() =>
+                      navigate(`/company/${c.corpCode}?stockCode=${c.stockCode}&corpName=${encodeURIComponent(c.corpName)}`)
+                    }
+                  >
+                    <span className="result-name">{c.corpName}</span>
+                    <span className="result-code">{c.stockCode}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      }
+
+      function CompanyPage({ corpCode, stockCode, corpNameParam }) {
+        const { user } = useAuth()
+        const navigate = useContext(NavigateContext)
+
+        const [data, setData] = useState(null)
+        const [error, setError] = useState(null)
+        const [loading, setLoading] = useState(true)
+        const [watchlistId, setWatchlistId] = useState(null)
+        const [watchlistBusy, setWatchlistBusy] = useState(false)
+
+        useEffect(() => {
+          let cancelled = false
+          setLoading(true)
+          setError(null)
+          fetchCompanyDashboard(corpCode, stockCode)
+            .then((result) => {
+              if (!cancelled) setData(result)
+            })
+            .catch((err) => {
+              if (!cancelled) setError(err.message)
+            })
+            .finally(() => {
+              if (!cancelled) setLoading(false)
+            })
+          return () => {
+            cancelled = true
+          }
+        }, [corpCode, stockCode])
+
+        useEffect(() => {
+          if (!user) {
+            setWatchlistId(null)
+            return
+          }
+          let cancelled = false
+          getWatchlist()
+            .then((list) => {
+              if (cancelled) return
+              const match = list.find((w) => w.corpCode === corpCode)
+              setWatchlistId(match?.id ?? null)
+            })
+            .catch(() => {})
+          return () => {
+            cancelled = true
+          }
+        }, [user, corpCode])
+
+        const corpName = corpNameParam || data?.price?.name || ''
+
+        const toggleWatchlist = async () => {
+          if (!user) {
+            navigate('/login')
+            return
+          }
+          setWatchlistBusy(true)
+          try {
+            if (watchlistId) {
+              await removeFromWatchlist(watchlistId)
+              setWatchlistId(null)
+            } else {
+              const item = await addToWatchlist({ corpCode, corpName, stockCode })
+              setWatchlistId(item.id)
+            }
+          } catch (err) {
+            setError(err.message)
+          } finally {
+            setWatchlistBusy(false)
+          }
+        }
+
+        return (
+          <div className="page">
+            <Link to="/" className="back-link">
+              ← 검색으로 돌아가기
+            </Link>
+
+            <div className="company-header">
+              <h1>{corpName || '기업 상세'}</h1>
+              <button
+                type="button"
+                className={`watch-btn${watchlistId ? ' active' : ''}`}
+                onClick={toggleWatchlist}
+                disabled={watchlistBusy}
+              >
+                {watchlistId ? '★ 관심기업' : '☆ 관심기업 추가'}
+              </button>
+            </div>
+
+            {loading && <p className="status">불러오는 중...</p>}
+            {error && <p className="status error">오류: {error}</p>}
+
+            {data && (
+              <>
+                {(data.reports?.[0]?.mock || data.financials?.[0]?.mock) && (
+                  <p className="notice">
+                    DART API 키가 아직 발급되지 않아 사업보고서·재무 항목은 샘플 데이터입니다. (시세·차트는 실데이터입니다)
+                    키가 발급되면 자동으로 실제 데이터로 전환됩니다.
+                  </p>
+                )}
+
+                <section className="section">
+                  <h2>현재 시세</h2>
+                  {data.price ? (
+                    <div className="price-summary">
+                      <span className="price">{formatNumber(data.price.price)}원</span>
+                      <span className={data.price.isRising ? 'up' : 'down'}>
+                        {data.price.change} ({data.price.changeRate}%)
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="status">시세 정보가 없습니다.</p>
+                  )}
+                </section>
+
+                <section className="section">
+                  <h2>차트</h2>
+                  <StockChart data={data.chart} />
+                </section>
+
+                <section className="section">
+                  <h2>재무 (최근 3개년)</h2>
+                  <FinancialTable data={data.financials} />
+                </section>
+
+                <section className="section">
+                  <h2>사업보고서 (최근 3년)</h2>
+                  <ReportList reports={data.reports} />
+                </section>
+              </>
+            )}
+          </div>
+        )
+      }
+
+      function WatchlistPage() {
+        const { user, loading: authLoading } = useAuth()
+        const [items, setItems] = useState([])
+        const [loading, setLoading] = useState(true)
+        const [error, setError] = useState(null)
+
+        useEffect(() => {
+          if (!user) {
+            setLoading(false)
+            return
+          }
+          setLoading(true)
+          getWatchlist()
+            .then(setItems)
+            .catch((err) => setError(err.message))
+            .finally(() => setLoading(false))
+        }, [user])
+
+        const handleRemove = async (id) => {
+          try {
+            await removeFromWatchlist(id)
+            setItems((prev) => prev.filter((i) => i.id !== id))
+          } catch (err) {
+            setError(err.message)
+          }
+        }
+
+        if (authLoading) {
+          return (
+            <div className="page">
+              <p className="status">불러오는 중...</p>
+            </div>
+          )
+        }
+
+        if (!user) {
+          return (
+            <div className="page">
+              <header className="header">
+                <h1>관심기업</h1>
+                <p className="tagline">
+                  관심기업을 저장하고 계속 확인하려면 <Link to="/login">로그인</Link>이 필요합니다.
+                </p>
+              </header>
+            </div>
+          )
+        }
+
+        return (
+          <div className="page">
+            <header className="header">
+              <h1>관심기업</h1>
+              <p className="tagline">저장해 둔 기업을 최신 순으로 바로 확인하세요</p>
+            </header>
+
+            {error && <p className="status error">오류: {error}</p>}
+            {loading && <p className="status">불러오는 중...</p>}
+            {!loading && items.length === 0 && <p className="status">저장된 관심기업이 없습니다.</p>}
+
+            <ul className="search-results">
+              {items.map((c) => (
+                <li key={c.id} className="watchlist-row">
+                  <Link
+                    className="result-item"
+                    to={`/company/${c.corpCode}?stockCode=${c.stockCode}&corpName=${encodeURIComponent(c.corpName || '')}`}
+                  >
+                    <span className="result-name">{c.corpName}</span>
+                    <span className="result-code">{c.stockCode}</span>
+                  </Link>
+                  <button type="button" className="remove-btn" onClick={() => handleRemove(c.id)}>
+                    삭제
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      }
+
+      function LoginPage() {
+        const [email, setEmail] = useState('')
+        const [password, setPassword] = useState('')
+        const [error, setError] = useState(null)
+        const [loading, setLoading] = useState(false)
+        const { login } = useAuth()
+        const navigate = useContext(NavigateContext)
+
+        const handleSubmit = async (e) => {
+          e.preventDefault()
+          setLoading(true)
+          setError(null)
+          try {
+            await login(email, password)
+            navigate('/')
+          } catch (err) {
+            setError(err.message)
+          } finally {
+            setLoading(false)
+          }
+        }
+
+        return (
+          <div className="page auth-page">
+            <h1>로그인</h1>
+            <form className="auth-form" onSubmit={handleSubmit}>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="이메일" required />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="비밀번호"
+                required
+              />
+              {error && <p className="status error">{error}</p>}
+              <button type="submit" disabled={loading}>
+                {loading ? '로그인 중...' : '로그인'}
+              </button>
+            </form>
+            <p className="auth-switch">
+              계정이 없으신가요? <Link to="/register">회원가입</Link>
+            </p>
+          </div>
+        )
+      }
+
+      function RegisterPage() {
+        const [email, setEmail] = useState('')
+        const [password, setPassword] = useState('')
+        const [error, setError] = useState(null)
+        const [loading, setLoading] = useState(false)
+        const { register } = useAuth()
+        const navigate = useContext(NavigateContext)
+
+        const handleSubmit = async (e) => {
+          e.preventDefault()
+          setLoading(true)
+          setError(null)
+          try {
+            await register(email, password)
+            navigate('/')
+          } catch (err) {
+            setError(err.message)
+          } finally {
+            setLoading(false)
+          }
+        }
+
+        return (
+          <div className="page auth-page">
+            <h1>회원가입</h1>
+            <form className="auth-form" onSubmit={handleSubmit}>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="이메일" required />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="비밀번호 (6자 이상)"
+                required
+              />
+              {error && <p className="status error">{error}</p>}
+              <button type="submit" disabled={loading}>
+                {loading ? '가입 중...' : '회원가입'}
+              </button>
+            </form>
+            <p className="auth-switch">
+              이미 계정이 있으신가요? <Link to="/login">로그인</Link>
+            </p>
+          </div>
+        )
+      }
+
+      /* ===================== 앱 루트 (라우팅) ===================== */
+      function App() {
+        const [url, navigate] = useRouter()
+        const [pathname, search] = url.split('?')
+        const route = matchRoute(pathname)
+        const params = new URLSearchParams(search || '')
+
+        let page
+        switch (route.name) {
+          case 'search':
+            page = <SearchPage />
+            break
+          case 'company':
+            page = (
+              <CompanyPage
+                key={route.corpCode}
+                corpCode={route.corpCode}
+                stockCode={params.get('stockCode')}
+                corpNameParam={params.get('corpName')}
+              />
+            )
+            break
+          case 'watchlist':
+            page = <WatchlistPage />
+            break
+          case 'login':
+            page = <LoginPage />
+            break
+          case 'register':
+            page = <RegisterPage />
+            break
+          default:
+            page = (
+              <div className="page">
+                <p className="status">페이지를 찾을 수 없습니다.</p>
+              </div>
+            )
+        }
+
+        return (
+          <NavigateContext.Provider value={navigate}>
+            <Nav />
+            {page}
+          </NavigateContext.Provider>
+        )
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(
+        <AuthProvider>
+          <App />
+        </AuthProvider>,
+      )
+    </script>
+
+    <script>
+      // Babel standalone의 최신 preset-react 기본값(automatic runtime)은
+      // `import ... from "react/jsx-runtime"`을 코드에 삽입하는데, 이는 번들러 없이
+      // <script>로 바로 실행할 수 없다. classic 런타임(React.createElement)으로 명시 변환한다.
+      const source = document.getElementById('app-source').textContent
+      const { code } = Babel.transform(source, {
+        presets: [['react', { runtime: 'classic' }]],
+        filename: 'app.jsx',
+      })
+      const script = document.createElement('script')
+      script.textContent = code
+      document.body.appendChild(script)
+    </script>
   </body>
 </html>
