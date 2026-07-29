@@ -85,7 +85,7 @@ export async function searchCompanies(query) {
   return matches.slice(0, SEARCH_RESULT_LIMIT)
 }
 
-export async function getReports(corpCode, years = 3) {
+export async function getReports(corpCode, years = 5) {
   if (!hasApiKey()) {
     const company = MOCK_COMPANIES.find((c) => c.corpCode === corpCode)
     return mockReports(company?.corpName ?? '샘플기업', years)

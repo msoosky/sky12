@@ -13,7 +13,7 @@ export async function searchCompanies(query) {
   return MOCK_COMPANIES.filter((c) => c.corpName.toLowerCase().includes(q)).map((c) => ({ ...c, mock: true }))
 }
 
-export async function getReports(corpCode, years = 3) {
+export async function getReports(corpCode, years = 5) {
   const company = MOCK_COMPANIES.find((c) => c.corpCode === corpCode)
   return mockReports(company?.corpName ?? '샘플기업', years)
 }

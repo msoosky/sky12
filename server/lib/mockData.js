@@ -9,7 +9,7 @@ export const MOCK_COMPANIES = [
   { corpCode: 'MOCK00006', corpName: '현대차', stockCode: '005380' },
 ]
 
-export function mockReports(corpName, years = 3) {
+export function mockReports(corpName, years = 5) {
   const currentYear = new Date().getFullYear()
   return Array.from({ length: years }, (_, i) => {
     const year = currentYear - 1 - i
