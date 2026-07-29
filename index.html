@@ -940,7 +940,9 @@
         const [loading, setLoading] = useState(true)
         const [watchlistId, setWatchlistId] = useState(null)
         const [watchlistBusy, setWatchlistBusy] = useState(false)
-        const [selectedRange, setSelectedRange] = useState('all')
+        // 기간 선택은 "상대 기간(1일~5년/전체)"과 "연도별(2020~전체)" 두 그룹이 각각 따로
+        // 있고, 마지막으로 누른 버튼이 차트에 반영된다.
+        const [chartFilter, setChartFilter] = useState({ type: 'range', key: 'all' })
 
         useEffect(() => {
           let cancelled = false
@@ -1003,13 +1005,19 @@
 
         const chartData = useMemo(() => {
           if (!data?.chart) return data?.chart
-          const range = CHART_RANGE_OPTIONS.find((r) => r.key === selectedRange)
+
+          if (chartFilter.type === 'year') {
+            if (chartFilter.key === 'all') return data.chart
+            return yearGroups.find((g) => g.year === chartFilter.key)?.rows ?? []
+          }
+
+          const range = CHART_RANGE_OPTIONS.find((r) => r.key === chartFilter.key)
           if (!range || range.days === null) return data.chart
           const cutoff = new Date()
           cutoff.setDate(cutoff.getDate() - range.days)
           const cutoffDate = cutoff.toISOString().slice(0, 10)
           return data.chart.filter((row) => row.date >= cutoffDate)
-        }, [data?.chart, selectedRange])
+        }, [data?.chart, chartFilter, yearGroups])
 
         const toggleWatchlist = async () => {
           setWatchlistBusy(true)
@@ -1079,13 +1087,37 @@
                       <button
                         key={r.key}
                         type="button"
-                        className={`year-btn${selectedRange === r.key ? ' active' : ''}`}
-                        onClick={() => setSelectedRange(r.key)}
+                        className={`year-btn${chartFilter.type === 'range' && chartFilter.key === r.key ? ' active' : ''}`}
+                        onClick={() => setChartFilter({ type: 'range', key: r.key })}
                       >
                         {r.label}
                       </button>
                     ))}
                   </div>
+                  {yearGroups.length > 0 && (
+                    <div className="year-selector">
+                      <button
+                        type="button"
+                        className={`year-btn${chartFilter.type === 'year' && chartFilter.key === 'all' ? ' active' : ''}`}
+                        onClick={() => setChartFilter({ type: 'year', key: 'all' })}
+                      >
+                        전체
+                      </button>
+                      {yearGroups
+                        .slice()
+                        .reverse()
+                        .map((g) => (
+                          <button
+                            key={g.year}
+                            type="button"
+                            className={`year-btn${chartFilter.type === 'year' && chartFilter.key === g.year ? ' active' : ''}`}
+                            onClick={() => setChartFilter({ type: 'year', key: g.year })}
+                          >
+                            {g.year}
+                          </button>
+                        ))}
+                    </div>
+                  )}
                   <StockChart data={chartData} />
                 </section>
 
