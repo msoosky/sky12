@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { searchCompanies, getReports, getFinancials } from '../lib/dart.js'
-import { getPrice, getChart } from '../lib/naver.js'
+import { getPrice, getChartRange, EARLIEST_CHART_YEAR } from '../lib/naver.js'
 
 const router = Router()
 
@@ -40,7 +40,9 @@ router.get('/stock/:stockCode/price', async (req, res) => {
 
 router.get('/stock/:stockCode/chart', async (req, res) => {
   try {
-    res.json(await getChart(req.params.stockCode))
+    const startYear = Number(req.query.startYear) || EARLIEST_CHART_YEAR
+    const endYear = Number(req.query.endYear) || new Date().getFullYear()
+    res.json(await getChartRange(req.params.stockCode, startYear, endYear))
   } catch (e) {
     res.status(500).json({ error: e.message })
   }

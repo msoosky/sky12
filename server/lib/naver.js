@@ -29,36 +29,44 @@ export async function getPrice(stockCode) {
   return result
 }
 
-const MAX_PAGE_SIZE = 60 // 네이버 API가 페이지당 허용하는 최대 개수
+export const EARLIEST_CHART_YEAR = 2020
 
-export async function getChart(stockCode, days = 260) {
-  const cacheKey = `chart:${stockCode}:${days}`
+// 네이버 금융의 대량 시세 조회 엔드포인트. 모바일 API처럼 페이지당 60건씩 나눠받을
+// 필요 없이 원하는 기간(연 단위 다년치도 가능) 전체를 한 번의 요청으로 받아온다.
+// 응답이 엄밀한 JSON이 아니라 헤더 행은 작은따옴표, 데이터 행은 큰따옴표를 섞어 쓰는
+// JS 배열 리터럴 텍스트라서 JSON.parse 대신 데이터 행만 정규식으로 뽑아낸다.
+const ROW_REGEX = /\["(\d{8})",\s*([\d.]+),\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)/g
+
+export async function getChartRange(stockCode, startYear = EARLIEST_CHART_YEAR, endYear = new Date().getFullYear()) {
+  const cacheKey = `chartrange:${stockCode}:${startYear}:${endYear}`
   const cached = cache.get(cacheKey)
   if (cached) return cached
 
-  const pages = Math.ceil(days / MAX_PAGE_SIZE)
+  const { data } = await client.get('https://api.finance.naver.com/siseJson.naver', {
+    params: {
+      symbol: stockCode,
+      requestType: 1,
+      startTime: `${startYear}0101`,
+      endTime: `${endYear}1231`,
+      timeframe: 'day',
+    },
+    responseType: 'text',
+  })
 
-  const responses = await Promise.all(
-    Array.from({ length: pages }, (_, i) =>
-      client.get(`https://m.stock.naver.com/api/stock/${stockCode}/price`, {
-        params: { pageSize: MAX_PAGE_SIZE, page: i + 1 },
-      })
-    )
-  )
+  const rows = []
+  let match
+  ROW_REGEX.lastIndex = 0
+  while ((match = ROW_REGEX.exec(data)) !== null) {
+    const [, ymd, open, high, low, close] = match
+    rows.push({
+      date: `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`,
+      open: Number(open),
+      high: Number(high),
+      low: Number(low),
+      close: Number(close),
+    })
+  }
 
-  const combined = responses
-    .flatMap((r) => (Array.isArray(r.data) ? r.data : []))
-    .map((d) => ({
-      date: d.localDate || d.localTradedAt,
-      open: num(d.openPrice),
-      high: num(d.highPrice),
-      low: num(d.lowPrice),
-      close: num(d.closePrice),
-    }))
-    .filter((d) => d.date && !Number.isNaN(d.close))
-
-  const result = combined.slice(0, days).reverse()
-
-  cache.set(cacheKey, result, 60 * 5)
-  return result
+  cache.set(cacheKey, rows, 60 * 60) // 과거 시세는 거의 안 바뀌므로 1시간 캐싱
+  return rows
 }

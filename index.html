@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>페이지</title>
+    <title>기업 한눈에 보기!!</title>
     <meta name="description" content="기업을 검색해 사업보고서·재무·시세·차트를 한눈에 확인하고 관심기업으로 저장하는 사이트" />
     <style>
       body {
@@ -421,6 +421,40 @@
         text-decoration: underline;
       }
 
+      /* 연도별 차트 선택지 */
+      .year-selector {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-bottom: 1rem;
+      }
+
+      .year-btn {
+        padding: 0.35rem 0.85rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        background: #fff;
+        color: #475569;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+
+      .year-btn:hover {
+        border-color: #1d4ed8;
+      }
+
+      .year-btn.active {
+        background: #1d4ed8;
+        border-color: #1d4ed8;
+        color: #fff;
+      }
+
+      .year-date {
+        color: #94a3b8;
+        font-size: 0.8rem;
+      }
+
       /* 차트 (커스텀 SVG, 외부 라이브러리 없음) */
       .chart-wrap {
         position: relative;
@@ -472,16 +506,19 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script type="text/plain" id="app-source">
-      const { useState, useEffect, useRef, useContext, createContext } = React
+      const { useState, useEffect, useRef, useMemo, useContext, createContext } = React
 
       /* ===================== API 클라이언트 ===================== */
       const BASE = '/api'
-      const TTL = 60 * 1000
+      // 자주 안 바뀌는 데이터(보고서·재무·차트)는 길게, 실시간성이 중요한 시세는 짧게 캐싱해
+      // 체감 속도와 정확성 사이의 균형을 맞춘다. 서버 쪽에도 자체 캐시가 있어 이중으로 보호된다.
+      const TTL_DEFAULT = 5 * 60 * 1000
+      const TTL_PRICE = 20 * 1000
       const requestCache = new Map()
 
-      async function cachedFetch(url) {
+      async function cachedFetch(url, ttl = TTL_DEFAULT) {
         const hit = requestCache.get(url)
-        if (hit && Date.now() - hit.time < TTL) return hit.data
+        if (hit && Date.now() - hit.time < ttl) return hit.data
 
         const res = await fetch(url)
         if (!res.ok) {
@@ -493,21 +530,32 @@
         return data
       }
 
-      const searchCompanies = (q) => cachedFetch(`${BASE}/search?q=${encodeURIComponent(q)}`)
+      const searchCompanies = (q) => cachedFetch(`${BASE}/search?q=${encodeURIComponent(q)}`, 60 * 1000)
       const getReports = (corpCode) => cachedFetch(`${BASE}/company/${corpCode}/reports`)
       const getFinancials = (corpCode) => cachedFetch(`${BASE}/company/${corpCode}/financials`)
-      const getPrice = (stockCode) => cachedFetch(`${BASE}/stock/${stockCode}/price`)
-      const getChart = (stockCode) => cachedFetch(`${BASE}/stock/${stockCode}/chart`)
+      const getPrice = (stockCode) => cachedFetch(`${BASE}/stock/${stockCode}/price`, TTL_PRICE)
+      const getChart = (stockCode, startYear, endYear) =>
+        cachedFetch(`${BASE}/stock/${stockCode}/chart?startYear=${startYear}&endYear=${endYear}`, 30 * 60 * 1000)
 
-      // 보고서/재무/시세/차트를 병렬로 조회해 응답 속도를 최적화
+      const EARLIEST_CHART_YEAR = 2020
+      const CURRENT_YEAR = new Date().getFullYear()
+
+      // 보고서/재무/시세/차트를 병렬로 조회해 응답 속도를 최적화.
+      // allSettled를 써서 시세처럼 일부 종목에서만 실패하는 항목이 있어도
+      // 나머지(보고서·재무·차트)는 정상적으로 화면에 표시되도록 한다.
       async function fetchCompanyDashboard(corpCode, stockCode) {
-        const [reports, financials, price, chart] = await Promise.all([
+        const [reports, financials, price, chart] = await Promise.allSettled([
           getReports(corpCode),
           getFinancials(corpCode),
           getPrice(stockCode),
-          getChart(stockCode),
+          getChart(stockCode, EARLIEST_CHART_YEAR, CURRENT_YEAR),
         ])
-        return { reports, financials, price, chart }
+        return {
+          reports: reports.status === 'fulfilled' ? reports.value : [],
+          financials: financials.status === 'fulfilled' ? financials.value : [],
+          price: price.status === 'fulfilled' ? price.value : null,
+          chart: chart.status === 'fulfilled' ? chart.value : [],
+        }
       }
 
       async function jsonFetch(url, options = {}) {
@@ -684,6 +732,41 @@
         )
       }
 
+      // 연도별로 묶은 시세에서 그 해의 첫/마지막 거래일 종가(연초·연말 시세)를 숫자로 보여준다.
+      function YearPriceTable({ groups }) {
+        if (!groups || groups.length === 0) return <p className="status">연도별 시세 데이터가 없습니다.</p>
+
+        return (
+          <table className="financial-table">
+            <thead>
+              <tr>
+                <th>연도</th>
+                <th>연초 시세</th>
+                <th>연말 시세</th>
+                <th>등락률</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groups.map((g) => (
+                <tr key={g.year}>
+                  <td>{g.year}</td>
+                  <td>
+                    {formatNumber(g.startClose)}원 <span className="year-date">({g.startDate})</span>
+                  </td>
+                  <td>
+                    {formatNumber(g.endClose)}원 <span className="year-date">({g.endDate})</span>
+                  </td>
+                  <td className={g.changeRate >= 0 ? 'up' : 'down'}>
+                    {g.changeRate >= 0 ? '+' : ''}
+                    {g.changeRate.toFixed(2)}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      }
+
       function ReportList({ reports }) {
         if (!reports || reports.length === 0) return <p className="status">사업보고서가 없습니다.</p>
 
@@ -792,7 +875,7 @@
 
       /* ===================== 페이지 ===================== */
       const DEBOUNCE_MS = 200
-      const MAX_SUGGESTIONS = 8
+      const MAX_SUGGESTIONS = 10
 
       function SearchPage() {
         const navigate = useContext(NavigateContext)
@@ -954,6 +1037,7 @@
         const [loading, setLoading] = useState(true)
         const [watchlistId, setWatchlistId] = useState(null)
         const [watchlistBusy, setWatchlistBusy] = useState(false)
+        const [selectedYear, setSelectedYear] = useState('all')
 
         useEffect(() => {
           let cancelled = false
@@ -993,6 +1077,34 @@
         }, [user, corpCode])
 
         const corpName = corpNameParam || data?.price?.name || ''
+
+        // 일별 시세를 연도로 묶어 연도별 선택지와 연초·연말 시세표에 함께 사용한다.
+        const yearGroups = useMemo(() => {
+          if (!data?.chart || data.chart.length === 0) return []
+          const byYear = new Map()
+          for (const row of data.chart) {
+            const year = row.date.slice(0, 4)
+            if (!byYear.has(year)) byYear.set(year, [])
+            byYear.get(year).push(row)
+          }
+          return [...byYear.entries()]
+            .map(([year, rows]) => {
+              const start = rows[0]
+              const end = rows[rows.length - 1]
+              return {
+                year,
+                rows,
+                startClose: start.close,
+                startDate: start.date,
+                endClose: end.close,
+                endDate: end.date,
+                changeRate: start.close ? ((end.close - start.close) / start.close) * 100 : 0,
+              }
+            })
+            .sort((a, b) => b.year.localeCompare(a.year))
+        }, [data?.chart])
+
+        const chartData = selectedYear === 'all' ? data?.chart : yearGroups.find((g) => g.year === selectedYear)?.rows
 
         const toggleWatchlist = async () => {
           if (!user) {
@@ -1061,7 +1173,36 @@
 
                 <section className="section">
                   <h2>차트</h2>
-                  <StockChart data={data.chart} />
+                  {yearGroups.length > 0 && (
+                    <div className="year-selector">
+                      <button
+                        type="button"
+                        className={`year-btn${selectedYear === 'all' ? ' active' : ''}`}
+                        onClick={() => setSelectedYear('all')}
+                      >
+                        전체
+                      </button>
+                      {yearGroups
+                        .slice()
+                        .reverse()
+                        .map((g) => (
+                          <button
+                            key={g.year}
+                            type="button"
+                            className={`year-btn${selectedYear === g.year ? ' active' : ''}`}
+                            onClick={() => setSelectedYear(g.year)}
+                          >
+                            {g.year}
+                          </button>
+                        ))}
+                    </div>
+                  )}
+                  <StockChart data={chartData} />
+                </section>
+
+                <section className="section">
+                  <h2>연도별 시세 (연초 · 연말)</h2>
+                  <YearPriceTable groups={yearGroups} />
                 </section>
 
                 <section className="section">

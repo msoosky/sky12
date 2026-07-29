@@ -20,9 +20,11 @@ function formatDate(date) {
   return date.toISOString().slice(0, 10).replace(/-/g, '')
 }
 
-async function loadCorpCodes() {
-  const cached = cache.get('corpCodes')
-  if (cached) return cached
+async function loadCorpCodes(forceRefresh = false) {
+  if (!forceRefresh) {
+    const cached = cache.get('corpCodes')
+    if (cached) return cached
+  }
 
   const res = await axios.get(`${BASE}/corpCode.xml`, {
     params: { crtfc_key: apiKey() },
@@ -31,7 +33,9 @@ async function loadCorpCodes() {
 
   const zip = new AdmZip(res.data)
   const xml = zip.readAsText('CORPCODE.xml')
-  const parser = new XMLParser()
+  // parseTagValue 기본값(true)은 "00126380"·"005930" 같은 코드의 앞자리 0을 숫자로
+  // 변환하며 날려버린다. 기업/종목 코드는 반드시 원문 문자열 그대로 유지해야 한다.
+  const parser = new XMLParser({ parseTagValue: false })
   const parsed = parser.parse(xml)
   const rawList = Array.isArray(parsed.result.list) ? parsed.result.list : [parsed.result.list]
 
@@ -47,6 +51,11 @@ async function loadCorpCodes() {
   return list
 }
 
+// 서버 기동 시 목록을 미리 데워두고, 이후 매일 강제로 다시 받아와 최신 상태를 유지한다.
+export const refreshCorpCodes = () => loadCorpCodes(true)
+
+const SEARCH_RESULT_LIMIT = 50
+
 export async function searchCompanies(query) {
   const q = query.trim().toLowerCase()
 
@@ -58,7 +67,7 @@ export async function searchCompanies(query) {
   }
 
   const list = await loadCorpCodes()
-  return list.filter((c) => c.corpName.toLowerCase().includes(q)).slice(0, 20)
+  return list.filter((c) => c.corpName.toLowerCase().includes(q)).slice(0, SEARCH_RESULT_LIMIT)
 }
 
 export async function getReports(corpCode, years = 3) {
@@ -100,37 +109,53 @@ export async function getReports(corpCode, years = 3) {
   return list
 }
 
+// 회사/연도/보고서 개정에 따라 같은 항목이 다른 계정명으로 잡히는 경우가 많고
+// (예: 매출액 vs 영업수익, 당기순이익 vs 당기순이익(손실)), 손익계산서를 별도(IS)로
+// 내는 회사도 있고 포괄손익계산서(CIS) 하나로 합쳐서 내는 회사도 있어 둘 다 확인한다.
+function pickAny(list, names) {
+  for (const name of names) {
+    const found = list.find((i) => (i.sj_div === 'IS' || i.sj_div === 'CIS') && i.account_nm === name)?.thstrm_amount
+    if (found !== undefined) return found
+  }
+  return undefined
+}
+
+async function fetchFinancialStatement(corpCode, year, fsDiv) {
+  const { data } = await axios.get(`${BASE}/fnlttSinglAcntAll.json`, {
+    params: {
+      crtfc_key: apiKey(),
+      corp_code: corpCode,
+      bsns_year: year,
+      reprt_code: '11011', // 사업보고서(연간)
+      fs_div: fsDiv,
+    },
+  })
+  if (data.status !== '000' || !Array.isArray(data.list)) return null
+  return data.list
+}
+
 async function fetchFinancialForYear(corpCode, year) {
   const cacheKey = `financial:${corpCode}:${year}`
   const cached = cache.get(cacheKey)
   if (cached) return cached
 
   try {
-    const { data } = await axios.get(`${BASE}/fnlttSinglAcntAll.json`, {
-      params: {
-        crtfc_key: apiKey(),
-        corp_code: corpCode,
-        bsns_year: year,
-        reprt_code: '11011', // 사업보고서(연간)
-        fs_div: 'CFS', // 연결재무제표
-      },
-    })
+    // 연결재무제표(CFS)를 우선 시도하고, 자회사가 없어 연결 재무제표가 없는 회사는
+    // 개별재무제표(OFS)로 대체 조회한다.
+    const list = (await fetchFinancialStatement(corpCode, year, 'CFS')) ?? (await fetchFinancialStatement(corpCode, year, 'OFS'))
 
-    if (data.status !== '000' || !Array.isArray(data.list)) {
+    if (!list) {
       const result = { year, available: false }
       cache.set(cacheKey, result, 60 * 60 * 24)
       return result
     }
 
-    const pick = (name) =>
-      data.list.find((i) => i.sj_div === 'IS' && i.account_nm === name)?.thstrm_amount
-
     const result = {
       year,
       available: true,
-      revenue: pick('매출액') ?? pick('수익(매출액)'),
-      operatingProfit: pick('영업이익'),
-      netIncome: pick('당기순이익') ?? pick('분기순이익'),
+      revenue: pickAny(list, ['매출액', '수익(매출액)', '영업수익']),
+      operatingProfit: pickAny(list, ['영업이익', '영업이익(손실)']),
+      netIncome: pickAny(list, ['당기순이익', '당기순이익(손실)', '분기순이익', '분기순이익(손실)', '반기순이익(손실)']),
     }
     cache.set(cacheKey, result, 60 * 60 * 24)
     return result
