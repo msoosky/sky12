@@ -422,6 +422,33 @@
         gap: 0.15rem;
         pointer-events: none;
       }
+
+      /* 재무 막대그래프 범례 + 그래프-표 사이 간격 */
+      .chart-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1.25rem;
+        justify-content: center;
+        margin-top: 0.5rem;
+      }
+
+      .legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: #475569;
+        font-size: 0.85rem;
+      }
+
+      .legend-swatch {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+      }
+
+      .financial-table {
+        margin-top: 1.5rem;
+      }
     </style>
   </head>
   <body>
@@ -642,6 +669,99 @@
               ))}
             </tbody>
           </table>
+        )
+      }
+
+      const FINANCIAL_METRICS = [
+        { key: 'revenue', label: '매출액', color: '#1d4ed8' },
+        { key: 'operatingProfit', label: '영업이익', color: '#16a34a' },
+        { key: 'netIncome', label: '당기순이익', color: '#f59e0b' },
+      ]
+
+      // 매출액·영업이익·당기순이익을 연도별 막대그래프로 보여준다 (표와 같은 데이터, 다른 형태).
+      function FinancialChart({ data }) {
+        const [hover, setHover] = useState(null)
+        const years = (data || []).filter((d) => d.available).sort((a, b) => a.year - b.year)
+
+        if (years.length === 0) return null
+
+        const width = 700
+        const height = 280
+        const padding = { top: 20, right: 10, bottom: 24, left: 80 }
+        const innerW = width - padding.left - padding.right
+        const innerH = height - padding.top - padding.bottom
+
+        const maxValue = Math.max(1, ...years.flatMap((d) => FINANCIAL_METRICS.map((m) => Number(d[m.key]) || 0)))
+        const yAt = (v) => padding.top + innerH - (v / maxValue) * innerH
+
+        const groupWidth = innerW / years.length
+        const barGap = 6
+        const barWidth = (groupWidth - barGap * (FINANCIAL_METRICS.length + 1)) / FINANCIAL_METRICS.length
+
+        const tickCount = 4
+        const yTicks = Array.from({ length: tickCount + 1 }, (_, i) => (maxValue * i) / tickCount)
+
+        return (
+          <div className="chart-wrap">
+            <svg viewBox={`0 0 ${width} ${height}`} className="stock-svg">
+              {yTicks.map((t, i) => (
+                <g key={i}>
+                  <line x1={padding.left} x2={width - padding.right} y1={yAt(t)} y2={yAt(t)} className="chart-grid" />
+                  <text x={padding.left - 8} y={yAt(t)} textAnchor="end" dominantBaseline="middle" className="chart-axis-label">
+                    {formatNumber(Math.round(t))}
+                  </text>
+                </g>
+              ))}
+
+              {years.map((d, gi) => {
+                const groupX = padding.left + gi * groupWidth
+                return (
+                  <g key={d.year}>
+                    {FINANCIAL_METRICS.map((m, mi) => {
+                      const value = Number(d[m.key]) || 0
+                      const barX = groupX + barGap + mi * (barWidth + barGap)
+                      const barY = yAt(Math.max(value, 0))
+                      const barHeight = Math.max(0, padding.top + innerH - barY)
+                      return (
+                        <rect
+                          key={m.key}
+                          x={barX}
+                          y={barY}
+                          width={Math.max(0, barWidth)}
+                          height={barHeight}
+                          fill={m.color}
+                          opacity={hover && (hover.year !== d.year || hover.metric !== m.key) ? 0.55 : 1}
+                          onMouseEnter={() => setHover({ year: d.year, metric: m.key, label: m.label, value })}
+                          onMouseLeave={() => setHover(null)}
+                        />
+                      )
+                    })}
+                    <text x={groupX + groupWidth / 2} y={height - 4} textAnchor="middle" className="chart-axis-label">
+                      {d.year}
+                    </text>
+                  </g>
+                )
+              })}
+            </svg>
+
+            <div className="chart-legend">
+              {FINANCIAL_METRICS.map((m) => (
+                <span key={m.key} className="legend-item">
+                  <span className="legend-swatch" style={{ background: m.color }}></span>
+                  {m.label}
+                </span>
+              ))}
+            </div>
+
+            {hover && (
+              <div className="chart-tooltip">
+                <strong>
+                  {hover.year}년 {hover.label}
+                </strong>
+                <span>{formatNumber(hover.value)}원</span>
+              </div>
+            )}
+          </div>
         )
       }
 
@@ -1128,6 +1248,7 @@
 
                 <section className="section">
                   <h2>재무 (최근 3개년)</h2>
+                  <FinancialChart data={data.financials} />
                   <FinancialTable data={data.financials} />
                 </section>
 
