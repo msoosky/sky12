@@ -8,6 +8,8 @@ const client = axios.create({
   timeout: 5000,
 })
 
+const num = (v) => (typeof v === 'string' ? Number(v.replace(/,/g, '')) : v)
+
 export async function getPrice(stockCode) {
   const cacheKey = `price:${stockCode}`
   const cached = cache.get(cacheKey)
@@ -17,7 +19,7 @@ export async function getPrice(stockCode) {
 
   const result = {
     name: data.stockName,
-    price: data.closePrice,
+    price: num(data.closePrice),
     change: data.compareToPreviousClosePrice,
     changeRate: data.fluctuationsRatio,
     isRising: data.compareToPreviousPrice?.code === '2',
@@ -43,8 +45,6 @@ export async function getChart(stockCode, days = 260) {
       })
     )
   )
-
-  const num = (v) => (typeof v === 'string' ? Number(v.replace(/,/g, '')) : v)
 
   const combined = responses
     .flatMap((r) => (Array.isArray(r.data) ? r.data : []))

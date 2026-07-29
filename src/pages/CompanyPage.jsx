@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useParams, useSearchParams, Link } from 'react-router-dom'
-import { fetchCompanyDashboard } from '../api/client.js'
+import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom'
+import { fetchCompanyDashboard, getWatchlist, addToWatchlist, removeFromWatchlist } from '../api/client.js'
+import { useAuth } from '../context/AuthContext.jsx'
 import StockChart from '../components/StockChart.jsx'
 import FinancialTable from '../components/FinancialTable.jsx'
 import ReportList from '../components/ReportList.jsx'
@@ -9,10 +10,15 @@ function CompanyPage() {
   const { corpCode } = useParams()
   const [searchParams] = useSearchParams()
   const stockCode = searchParams.get('stockCode')
+  const corpNameParam = searchParams.get('corpName')
+  const { user } = useAuth()
+  const navigate = useNavigate()
 
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [watchlistId, setWatchlistId] = useState(null)
+  const [watchlistBusy, setWatchlistBusy] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -33,11 +39,64 @@ function CompanyPage() {
     }
   }, [corpCode, stockCode])
 
+  useEffect(() => {
+    if (!user) {
+      setWatchlistId(null)
+      return
+    }
+    let cancelled = false
+    getWatchlist()
+      .then((list) => {
+        if (cancelled) return
+        const match = list.find((w) => w.corpCode === corpCode)
+        setWatchlistId(match?.id ?? null)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [user, corpCode])
+
+  const corpName = corpNameParam || data?.price?.name || ''
+
+  const toggleWatchlist = async () => {
+    if (!user) {
+      navigate('/login')
+      return
+    }
+    setWatchlistBusy(true)
+    try {
+      if (watchlistId) {
+        await removeFromWatchlist(watchlistId)
+        setWatchlistId(null)
+      } else {
+        const item = await addToWatchlist({ corpCode, corpName, stockCode })
+        setWatchlistId(item.id)
+      }
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setWatchlistBusy(false)
+    }
+  }
+
   return (
     <div className="page">
       <Link to="/" className="back-link">
         ← 검색으로 돌아가기
       </Link>
+
+      <div className="company-header">
+        <h1>{corpName || '기업 상세'}</h1>
+        <button
+          type="button"
+          className={`watch-btn${watchlistId ? ' active' : ''}`}
+          onClick={toggleWatchlist}
+          disabled={watchlistBusy}
+        >
+          {watchlistId ? '★ 관심기업' : '☆ 관심기업 추가'}
+        </button>
+      </div>
 
       {loading && <p className="status">불러오는 중...</p>}
       {error && <p className="status error">오류: {error}</p>}
