@@ -891,6 +891,14 @@
               )}
             </div>
 
+            {(suggestions.some((c) => c.mock) || results.some((c) => c.mock)) && (
+              <p className="notice">
+                이 배포 버전(Cloudflare Pages)은 DART 서버가 TLS 1.2만 지원해 직접 호출이 안 되는 한계로,
+                기업 검색·재무·사업보고서는 샘플 데이터입니다. 시세·차트는 실데이터입니다. 실제 검색 데이터가
+                필요하면 로컬에서 <code>npm run dev</code>로 실행하세요.
+              </p>
+            )}
+
             <ul className="search-results">
               {results.map((c) => (
                 <li key={c.corpCode}>
@@ -1021,6 +1029,13 @@
 
             {data && (
               <>
+                {(data.reports?.[0]?.mock || data.financials?.[0]?.mock) && (
+                  <p className="notice">
+                    이 배포 버전(Cloudflare Pages)은 DART 서버가 TLS 1.2만 지원해 직접 호출이 안 되는
+                    한계로, 사업보고서·재무 항목은 샘플 데이터입니다. (시세·차트는 실데이터입니다)
+                  </p>
+                )}
+
                 <section className="section">
                   <h2>현재 시세</h2>
                   {data.price ? (
