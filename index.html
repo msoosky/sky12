@@ -463,6 +463,20 @@
       const EARLIEST_CHART_YEAR = 2020
       const CURRENT_YEAR = new Date().getFullYear()
 
+      // 차트 기간 선택지. days:null은 "전체"(서버가 주는 전체 구간, EARLIEST_CHART_YEAR~오늘)를 뜻한다.
+      const CHART_RANGE_OPTIONS = [
+        { key: '1d', label: '1일', days: 1 },
+        { key: '3d', label: '3일', days: 3 },
+        { key: '1w', label: '1주', days: 7 },
+        { key: '1m', label: '1달', days: 30 },
+        { key: '3m', label: '3달', days: 90 },
+        { key: '6m', label: '6달', days: 180 },
+        { key: '1y', label: '1년', days: 365 },
+        { key: '3y', label: '3년', days: 365 * 3 },
+        { key: '5y', label: '5년', days: 365 * 5 },
+        { key: 'all', label: '전체', days: null },
+      ]
+
       const searchCompanies = (q) => cachedFetch(`${BASE}/search?q=${encodeURIComponent(q)}`, 60 * 1000)
       const getReports = (corpCode) => cachedFetch(`${BASE}/company/${corpCode}/reports`)
       const getFinancials = (corpCode) => cachedFetch(`${BASE}/company/${corpCode}/financials`)
@@ -926,7 +940,7 @@
         const [loading, setLoading] = useState(true)
         const [watchlistId, setWatchlistId] = useState(null)
         const [watchlistBusy, setWatchlistBusy] = useState(false)
-        const [selectedYear, setSelectedYear] = useState('all')
+        const [selectedRange, setSelectedRange] = useState('all')
 
         useEffect(() => {
           let cancelled = false
@@ -987,7 +1001,15 @@
             .sort((a, b) => b.year.localeCompare(a.year))
         }, [data?.chart])
 
-        const chartData = selectedYear === 'all' ? data?.chart : yearGroups.find((g) => g.year === selectedYear)?.rows
+        const chartData = useMemo(() => {
+          if (!data?.chart) return data?.chart
+          const range = CHART_RANGE_OPTIONS.find((r) => r.key === selectedRange)
+          if (!range || range.days === null) return data.chart
+          const cutoff = new Date()
+          cutoff.setDate(cutoff.getDate() - range.days)
+          const cutoffDate = cutoff.toISOString().slice(0, 10)
+          return data.chart.filter((row) => row.date >= cutoffDate)
+        }, [data?.chart, selectedRange])
 
         const toggleWatchlist = async () => {
           setWatchlistBusy(true)
@@ -1052,30 +1074,18 @@
 
                 <section className="section">
                   <h2>차트</h2>
-                  {yearGroups.length > 0 && (
-                    <div className="year-selector">
+                  <div className="year-selector">
+                    {CHART_RANGE_OPTIONS.map((r) => (
                       <button
+                        key={r.key}
                         type="button"
-                        className={`year-btn${selectedYear === 'all' ? ' active' : ''}`}
-                        onClick={() => setSelectedYear('all')}
+                        className={`year-btn${selectedRange === r.key ? ' active' : ''}`}
+                        onClick={() => setSelectedRange(r.key)}
                       >
-                        전체
+                        {r.label}
                       </button>
-                      {yearGroups
-                        .slice()
-                        .reverse()
-                        .map((g) => (
-                          <button
-                            key={g.year}
-                            type="button"
-                            className={`year-btn${selectedYear === g.year ? ' active' : ''}`}
-                            onClick={() => setSelectedYear(g.year)}
-                          >
-                            {g.year}
-                          </button>
-                        ))}
-                    </div>
-                  )}
+                    ))}
+                  </div>
                   <StockChart data={chartData} />
                 </section>
 
