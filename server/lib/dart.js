@@ -2,7 +2,7 @@ import axios from 'axios'
 import AdmZip from 'adm-zip'
 import { XMLParser } from 'fast-xml-parser'
 import cache from './cache.js'
-import { MOCK_COMPANIES, mockReports, mockFinancials } from './mockData.js'
+import { MOCK_COMPANIES, mockReports, mockFinancials, mockDividends } from './mockData.js'
 
 const BASE = 'https://opendart.fss.or.kr/api'
 
@@ -189,5 +189,61 @@ export async function getFinancials(corpCode, years = 3) {
   const targetYears = Array.from({ length: years }, (_, i) => currentYear - 1 - i)
 
   const results = await Promise.all(targetYears.map((year) => fetchFinancialForYear(corpCode, year)))
+  return results.sort((a, b) => b.year - a.year)
+}
+
+function parseDividendNumber(v) {
+  if (v === undefined || v === null || v === '-' || v === '') return undefined
+  const n = Number(String(v).replace(/,/g, ''))
+  return Number.isNaN(n) ? undefined : n
+}
+
+async function fetchDividendForYear(corpCode, year) {
+  const cacheKey = `dividend:${corpCode}:${year}`
+  const cached = cache.get(cacheKey)
+  if (cached) return cached
+
+  try {
+    const { data } = await axios.get(`${BASE}/alotMatter.json`, {
+      params: {
+        crtfc_key: apiKey(),
+        corp_code: corpCode,
+        bsns_year: year,
+        reprt_code: '11011', // 사업보고서(연간)
+      },
+    })
+
+    if (data.status !== '000' || !Array.isArray(data.list)) {
+      const result = { year, available: false }
+      cache.set(cacheKey, result, 60 * 60 * 24)
+      return result
+    }
+
+    const findItem = (se, stockKnd) => data.list.find((i) => i.se === se && (!stockKnd || i.stock_knd === stockKnd))
+
+    // status가 '000'이면 조회 자체는 성공한 것이므로 available: true로 두고, 값이 "-"라서
+    // undefined인 항목은 표에서 자연스럽게 "-"(그 해 배당 없음)로 보이게 한다.
+    const result = {
+      year,
+      available: true,
+      dividendPerShare: parseDividendNumber(findItem('주당 현금배당금(원)', '보통주')?.thstrm),
+      dividendYield: parseDividendNumber(findItem('현금배당수익률(%)', '보통주')?.thstrm),
+      payoutRatio: parseDividendNumber(findItem('(연결)현금배당성향(%)')?.thstrm),
+      totalCashDividend: parseDividendNumber(findItem('현금배당금총액(백만원)')?.thstrm),
+    }
+    cache.set(cacheKey, result, 60 * 60 * 24)
+    return result
+  } catch {
+    return { year, available: false }
+  }
+}
+
+export async function getDividends(corpCode, years = 3) {
+  if (!hasApiKey()) return mockDividends(years)
+
+  const currentYear = new Date().getFullYear()
+  const targetYears = Array.from({ length: years }, (_, i) => currentYear - 1 - i)
+
+  const results = await Promise.all(targetYears.map((year) => fetchDividendForYear(corpCode, year)))
   return results.sort((a, b) => b.year - a.year)
 }

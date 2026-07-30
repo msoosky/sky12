@@ -115,6 +115,18 @@
         color: #94a3b8;
       }
 
+      .market-badge {
+        display: inline-block;
+        margin-right: 0.4rem;
+        padding: 0.1rem 0.45rem;
+        border-radius: 999px;
+        background: #eef2ff;
+        color: #4338ca;
+        font-size: 0.7rem;
+        font-weight: 700;
+        vertical-align: middle;
+      }
+
       .back-link {
         display: inline-block;
         margin: 1.5rem 0 1rem;
@@ -504,26 +516,60 @@
         { key: 'all', label: '전체', days: null },
       ]
 
+      // 해외 종목은 국내처럼 원하는 기간을 한 번에 다 못 받아오고, day(약 5개월)·
+      // week(약 2년)·month(약 9년) 세 해상도로만 받아온다. 선택한 기간에 맞춰 그 중
+      // 가장 촘촘한 해상도를 고른다.
+      function overseasResolutionFor(filter) {
+        if (filter.type === 'year') return 'month'
+        const range = CHART_RANGE_OPTIONS.find((r) => r.key === filter.key)
+        if (!range || range.days === null) return 'month'
+        if (range.days <= 90) return 'day'
+        if (range.days <= 400) return 'week'
+        return 'month'
+      }
+
       const searchCompanies = (q) => cachedFetch(`${BASE}/search?q=${encodeURIComponent(q)}`, 60 * 1000)
       const getReports = (corpCode) => cachedFetch(`${BASE}/company/${corpCode}/reports`)
       const getFinancials = (corpCode) => cachedFetch(`${BASE}/company/${corpCode}/financials`)
+      const getDividends = (corpCode) => cachedFetch(`${BASE}/company/${corpCode}/dividends`)
       const getPrice = (stockCode) => cachedFetch(`${BASE}/stock/${stockCode}/price`, TTL_PRICE)
       const getChart = (stockCode, startYear, endYear) =>
         cachedFetch(`${BASE}/stock/${stockCode}/chart?startYear=${startYear}&endYear=${endYear}`, 30 * 60 * 1000)
 
-      // 보고서/재무/시세/차트를 병렬로 조회해 응답 속도를 최적화.
+      const searchOverseas = (q) => cachedFetch(`${BASE}/overseas/search?q=${encodeURIComponent(q)}`, 60 * 1000)
+      const getOverseasPrice = (symbol) => cachedFetch(`${BASE}/overseas/stock/${symbol}/price`, TTL_PRICE)
+      const getOverseasChart = (symbol) => cachedFetch(`${BASE}/overseas/stock/${symbol}/chart`, 30 * 60 * 1000)
+
+      // 보고서/재무/배당/시세/차트를 병렬로 조회해 응답 속도를 최적화.
       // allSettled를 써서 시세처럼 일부 종목에서만 실패하는 항목이 있어도
-      // 나머지(보고서·재무·차트)는 정상적으로 화면에 표시되도록 한다.
-      async function fetchCompanyDashboard(corpCode, stockCode) {
-        const [reports, financials, price, chart] = await Promise.allSettled([
+      // 나머지는 정상적으로 화면에 표시되도록 한다. 해외 종목은 DART 대상이 아니라서
+      // 보고서·재무·배당이 없고, 차트도 day/week/month 세 해상도를 그대로 넘겨
+      // 선택한 기간에 맞는 걸 화면에서 고르게 한다.
+      async function fetchCompanyDashboard(corpCode, stockCode, market) {
+        if (market === 'overseas') {
+          const [price, chart] = await Promise.allSettled([getOverseasPrice(stockCode), getOverseasChart(stockCode)])
+          return {
+            overseas: true,
+            reports: [],
+            financials: [],
+            dividends: [],
+            price: price.status === 'fulfilled' ? price.value : null,
+            chartResolutions: chart.status === 'fulfilled' ? chart.value : { day: [], week: [], month: [] },
+          }
+        }
+
+        const [reports, financials, dividends, price, chart] = await Promise.allSettled([
           getReports(corpCode),
           getFinancials(corpCode),
+          getDividends(corpCode),
           getPrice(stockCode),
           getChart(stockCode, EARLIEST_CHART_YEAR, CURRENT_YEAR),
         ])
         return {
+          overseas: false,
           reports: reports.status === 'fulfilled' ? reports.value : [],
           financials: financials.status === 'fulfilled' ? financials.value : [],
+          dividends: dividends.status === 'fulfilled' ? dividends.value : [],
           price: price.status === 'fulfilled' ? price.value : null,
           chart: chart.status === 'fulfilled' ? chart.value : [],
         }
@@ -637,6 +683,13 @@
       function formatNumber(value) {
         if (value === undefined || value === null) return '-'
         return Number(value).toLocaleString('ko-KR')
+      }
+
+      // 국내는 원화, 해외는 달러라서 단위 표기를 다르게 한다.
+      function formatPrice(value, overseas) {
+        if (value === undefined || value === null) return '-'
+        if (overseas) return `$${Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+        return `${formatNumber(value)}원`
       }
 
       function FinancialTable({ data }) {
@@ -765,8 +818,41 @@
         )
       }
 
+      function DividendTable({ data }) {
+        if (!data || data.length === 0) return <p className="status">배당 데이터가 없습니다.</p>
+
+        return (
+          <table className="financial-table">
+            <thead>
+              <tr>
+                <th>연도</th>
+                <th>주당 배당금</th>
+                <th>배당수익률</th>
+                <th>배당성향</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row) => (
+                <tr key={row.year}>
+                  <td>{row.year}</td>
+                  {row.available ? (
+                    <>
+                      <td>{row.dividendPerShare !== undefined ? `${formatNumber(row.dividendPerShare)}원` : '-'}</td>
+                      <td>{row.dividendYield !== undefined ? `${row.dividendYield}%` : '-'}</td>
+                      <td>{row.payoutRatio !== undefined ? `${row.payoutRatio}%` : '-'}</td>
+                    </>
+                  ) : (
+                    <td colSpan={3}>데이터 없음</td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      }
+
       // 연도별로 묶은 시세에서 그 해의 첫/마지막 거래일 종가(연초·연말 시세)를 숫자로 보여준다.
-      function YearPriceTable({ groups }) {
+      function YearPriceTable({ groups, overseas }) {
         if (!groups || groups.length === 0) return <p className="status">연도별 시세 데이터가 없습니다.</p>
 
         return (
@@ -784,10 +870,10 @@
                 <tr key={g.year}>
                   <td>{g.year}</td>
                   <td>
-                    {formatNumber(g.startClose)}원 <span className="year-date">({g.startDate})</span>
+                    {formatPrice(g.startClose, overseas)} <span className="year-date">({g.startDate})</span>
                   </td>
                   <td>
-                    {formatNumber(g.endClose)}원 <span className="year-date">({g.endDate})</span>
+                    {formatPrice(g.endClose, overseas)} <span className="year-date">({g.endDate})</span>
                   </td>
                   <td className={g.changeRate >= 0 ? 'up' : 'down'}>
                     {g.changeRate >= 0 ? '+' : ''}
@@ -820,7 +906,7 @@
       }
 
       // Recharts 등 외부 차트 라이브러리 없이 순수 SVG로 그리는 시세 차트
-      function StockChart({ data }) {
+      function StockChart({ data, overseas }) {
         const svgRef = useRef(null)
         const [hoverIdx, setHoverIdx] = useState(null)
 
@@ -899,7 +985,7 @@
             {hoverIdx !== null && (
               <div className="chart-tooltip">
                 <strong>{data[hoverIdx].date}</strong>
-                <span>{formatNumber(data[hoverIdx].close)}원</span>
+                <span>{formatPrice(data[hoverIdx].close, overseas)}</span>
               </div>
             )}
           </div>
@@ -928,8 +1014,13 @@
           }
           let cancelled = false
           const timer = setTimeout(async () => {
-            const list = await searchCompanies(q)
-            if (!cancelled) setSuggestions(list.slice(0, MAX_SUGGESTIONS))
+            const [kr, overseas] = await Promise.all([
+              searchCompanies(q).catch(() => []),
+              searchOverseas(q).catch(() => []),
+            ])
+            // 국내 결과가 많아도 해외 결과가 드롭다운에서 밀려나지 않도록 자리를 나눠 섞는다.
+            const merged = [...kr.slice(0, MAX_SUGGESTIONS - 3), ...overseas.slice(0, 3)]
+            if (!cancelled) setSuggestions(merged.slice(0, MAX_SUGGESTIONS))
           }, DEBOUNCE_MS)
           return () => {
             cancelled = true
@@ -951,7 +1042,8 @@
 
         const goToCompany = (c) => {
           setShowSuggestions(false)
-          navigate(`/company/${c.corpCode}?stockCode=${c.stockCode}&corpName=${encodeURIComponent(c.corpName)}`)
+          const marketParam = c.market === 'overseas' ? '&market=overseas' : ''
+          navigate(`/company/${c.corpCode}?stockCode=${c.stockCode}&corpName=${encodeURIComponent(c.corpName)}${marketParam}`)
         }
 
         const handleSearch = async (e) => {
@@ -960,7 +1052,11 @@
           setShowSuggestions(false)
           setLoading(true)
           try {
-            setResults(await searchCompanies(query))
+            const [kr, overseas] = await Promise.all([
+              searchCompanies(query).catch(() => []),
+              searchOverseas(query).catch(() => []),
+            ])
+            setResults([...kr, ...overseas])
           } finally {
             setLoading(false)
           }
@@ -1010,13 +1106,16 @@
               {showSuggestions && suggestions.length > 0 && (
                 <ul className="autocomplete-list">
                   {suggestions.map((c, i) => (
-                    <li key={c.corpCode}>
+                    <li key={`${c.market || 'kr'}-${c.corpCode}`}>
                       <button
                         type="button"
                         className={`autocomplete-item${i === activeIndex ? ' active' : ''}`}
                         onMouseDown={() => goToCompany(c)}
                       >
-                        <span className="result-name">{c.corpName}</span>
+                        <span className="result-name">
+                          {c.market === 'overseas' && <span className="market-badge">해외</span>}
+                          {c.corpName}
+                        </span>
                         <span className="result-code">{c.stockCode}</span>
                       </button>
                     </li>
@@ -1035,14 +1134,12 @@
 
             <ul className="search-results">
               {results.map((c) => (
-                <li key={c.corpCode}>
-                  <button
-                    className="result-item"
-                    onClick={() =>
-                      navigate(`/company/${c.corpCode}?stockCode=${c.stockCode}&corpName=${encodeURIComponent(c.corpName)}`)
-                    }
-                  >
-                    <span className="result-name">{c.corpName}</span>
+                <li key={`${c.market || 'kr'}-${c.corpCode}`}>
+                  <button className="result-item" onClick={() => goToCompany(c)}>
+                    <span className="result-name">
+                      {c.market === 'overseas' && <span className="market-badge">해외</span>}
+                      {c.corpName}
+                    </span>
                     <span className="result-code">{c.stockCode}</span>
                   </button>
                 </li>
@@ -1052,7 +1149,7 @@
         )
       }
 
-      function CompanyPage({ corpCode, stockCode, corpNameParam }) {
+      function CompanyPage({ corpCode, stockCode, corpNameParam, market }) {
         const navigate = useContext(NavigateContext)
 
         const [data, setData] = useState(null)
@@ -1068,7 +1165,7 @@
           let cancelled = false
           setLoading(true)
           setError(null)
-          fetchCompanyDashboard(corpCode, stockCode)
+          fetchCompanyDashboard(corpCode, stockCode, market)
             .then((result) => {
               if (!cancelled) setData(result)
             })
@@ -1081,7 +1178,7 @@
           return () => {
             cancelled = true
           }
-        }, [corpCode, stockCode, corpNameParam])
+        }, [corpCode, stockCode, corpNameParam, market])
 
         useEffect(() => {
           let cancelled = false
@@ -1098,10 +1195,12 @@
         const corpName = corpNameParam || data?.price?.name || ''
 
         // 일별 시세를 연도로 묶어 연도별 선택지와 연초·연말 시세표에 함께 사용한다.
+        // 해외 종목은 day/week/month 세 해상도 중 가장 범위가 넓은 month를 기준으로 묶는다.
         const yearGroups = useMemo(() => {
-          if (!data?.chart || data.chart.length === 0) return []
+          const source = data?.overseas ? data?.chartResolutions?.month : data?.chart
+          if (!source || source.length === 0) return []
           const byYear = new Map()
-          for (const row of data.chart) {
+          for (const row of source) {
             const year = row.date.slice(0, 4)
             if (!byYear.has(year)) byYear.set(year, [])
             byYear.get(year).push(row)
@@ -1121,23 +1220,24 @@
               }
             })
             .sort((a, b) => b.year.localeCompare(a.year))
-        }, [data?.chart])
+        }, [data?.chart, data?.chartResolutions, data?.overseas])
 
         const chartData = useMemo(() => {
-          if (!data?.chart) return data?.chart
+          const source = data?.overseas ? data?.chartResolutions?.[overseasResolutionFor(chartFilter)] : data?.chart
+          if (!source) return source
 
           if (chartFilter.type === 'year') {
-            if (chartFilter.key === 'all') return data.chart
+            if (chartFilter.key === 'all') return source
             return yearGroups.find((g) => g.year === chartFilter.key)?.rows ?? []
           }
 
           const range = CHART_RANGE_OPTIONS.find((r) => r.key === chartFilter.key)
-          if (!range || range.days === null) return data.chart
+          if (!range || range.days === null) return source
           const cutoff = new Date()
           cutoff.setDate(cutoff.getDate() - range.days)
           const cutoffDate = cutoff.toISOString().slice(0, 10)
-          return data.chart.filter((row) => row.date >= cutoffDate)
-        }, [data?.chart, chartFilter, yearGroups])
+          return source.filter((row) => row.date >= cutoffDate)
+        }, [data, chartFilter, yearGroups])
 
         const toggleWatchlist = async () => {
           setWatchlistBusy(true)
@@ -1179,10 +1279,17 @@
 
             {data && (
               <>
-                {(data.reports?.[0]?.mock || data.financials?.[0]?.mock) && (
+                {(data.reports?.[0]?.mock || data.financials?.[0]?.mock || data.dividends?.[0]?.mock) && (
                   <p className="notice">
                     이 배포 버전(Cloudflare Pages)은 DART 서버가 TLS 1.2만 지원해 직접 호출이 안 되는
-                    한계로, 사업보고서·재무 항목은 샘플 데이터입니다. (시세·차트는 실데이터입니다)
+                    한계로, 사업보고서·재무·배당 항목은 샘플 데이터입니다. (시세·차트는 실데이터입니다)
+                  </p>
+                )}
+
+                {data.overseas && (
+                  <p className="notice">
+                    해외 종목은 국내 전자공시(DART) 대상이 아니라서 사업보고서·재무·배당 정보는
+                    제공하지 않고, 시세·차트만 실데이터로 보여드립니다.
                   </p>
                 )}
 
@@ -1190,7 +1297,7 @@
                   <h2>현재 시세</h2>
                   {data.price ? (
                     <div className="price-summary">
-                      <span className="price">{formatNumber(data.price.price)}원</span>
+                      <span className="price">{formatPrice(data.price.price, data.overseas)}</span>
                       <span className={data.price.isRising ? 'up' : 'down'}>
                         {data.price.change} ({data.price.changeRate}%)
                       </span>
@@ -1238,24 +1345,33 @@
                         ))}
                     </div>
                   )}
-                  <StockChart data={chartData} />
+                  <StockChart data={chartData} overseas={data.overseas} />
                 </section>
 
                 <section className="section">
                   <h2>연도별 시세 (연초 · 연말)</h2>
-                  <YearPriceTable groups={yearGroups} />
+                  <YearPriceTable groups={yearGroups} overseas={data.overseas} />
                 </section>
 
-                <section className="section">
-                  <h2>재무 (최근 3개년)</h2>
-                  <FinancialChart data={data.financials} />
-                  <FinancialTable data={data.financials} />
-                </section>
+                {!data.overseas && (
+                  <>
+                    <section className="section">
+                      <h2>재무 (최근 3개년)</h2>
+                      <FinancialChart data={data.financials} />
+                      <FinancialTable data={data.financials} />
+                    </section>
 
-                <section className="section">
-                  <h2>사업보고서 (최근 5년)</h2>
-                  <ReportList reports={data.reports} />
-                </section>
+                    <section className="section">
+                      <h2>배당 (최근 3개년)</h2>
+                      <DividendTable data={data.dividends} />
+                    </section>
+
+                    <section className="section">
+                      <h2>사업보고서 (최근 5년)</h2>
+                      <ReportList reports={data.reports} />
+                    </section>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -1328,6 +1444,7 @@
                 corpCode={route.corpCode}
                 stockCode={params.get('stockCode')}
                 corpNameParam={params.get('corpName')}
+                market={params.get('market') || 'kr'}
               />
             )
             break

@@ -41,3 +41,22 @@ export function mockFinancials(years = 3) {
     }
   })
 }
+
+export function mockDividends(years = 3) {
+  const currentYear = new Date().getFullYear()
+  const base = { dividendPerShare: 1600, dividendYield: 1.5, payoutRatio: 25, totalCashDividend: 11000000 }
+
+  return Array.from({ length: years }, (_, i) => {
+    const year = currentYear - 1 - i
+    const factor = 1 - i * 0.05
+    return {
+      year,
+      available: true,
+      dividendPerShare: Math.round(base.dividendPerShare * factor),
+      dividendYield: Number((base.dividendYield * factor).toFixed(2)),
+      payoutRatio: Number((base.payoutRatio * factor).toFixed(2)),
+      totalCashDividend: Math.round(base.totalCashDividend * factor),
+      mock: true,
+    }
+  })
+}

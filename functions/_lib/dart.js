@@ -1,4 +1,4 @@
-import { MOCK_COMPANIES, mockReports, mockFinancials } from './mockData.js'
+import { MOCK_COMPANIES, mockReports, mockFinancials, mockDividends } from './mockData.js'
 
 // Cloudflare Pages Functions에서는 DART(opendart.fss.or.kr)를 직접 호출할 수 없다 —
 // DART 서버가 TLS 1.2만 지원하고 ALPN도 협상하지 않는데, Cloudflare Workers의 fetch()가
@@ -20,4 +20,8 @@ export async function getReports(corpCode, years = 5) {
 
 export async function getFinancials(years = 3) {
   return mockFinancials(years)
+}
+
+export async function getDividends(years = 3) {
+  return mockDividends(years)
 }
