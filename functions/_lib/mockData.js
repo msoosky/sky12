@@ -42,7 +42,7 @@ export function mockFinancials(years = 3) {
   })
 }
 
-export function mockDividends(years = 3) {
+export function mockDividends(years = 5) {
   const currentYear = new Date().getFullYear()
   const base = { dividendPerShare: 1600, dividendYield: 1.5, payoutRatio: 25, totalCashDividend: 11000000 }
 

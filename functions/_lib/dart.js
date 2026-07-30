@@ -22,6 +22,6 @@ export async function getFinancials(years = 3) {
   return mockFinancials(years)
 }
 
-export async function getDividends(years = 3) {
+export async function getDividends(years = 5) {
   return mockDividends(years)
 }

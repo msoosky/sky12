@@ -238,7 +238,7 @@ async function fetchDividendForYear(corpCode, year) {
   }
 }
 
-export async function getDividends(corpCode, years = 3) {
+export async function getDividends(corpCode, years = 5) {
   if (!hasApiKey()) return mockDividends(years)
 
   const currentYear = new Date().getFullYear()
